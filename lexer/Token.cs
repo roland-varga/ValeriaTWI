@@ -3,21 +3,22 @@ namespace Valeria.Lexer;
 public enum TokenType {
 
     /* TYPES */
-    NUMBER_LIT, IDENT, STRING_LIT,
+    NUMBER_LIT, IDENT, STRING_LIT, NIL,
 
 
     COMMA, LBRACKET, RBRACKET, ASSIGN_COLON,
     LPREN, RPREN, EQUAL, LBRACE, RBRACE, COLON,
+    DOT_DOT, DOT,
 
     /* LOGICAL */
-    EQUAL_EQUAL, NOT_EQUAL, GREATER,
+    EQUAL_EQUAL, NOT_EQUAL, GREATER, LESS,
 
     /* MATH */
     PLUS, MINUS, STAR, SLASH, NOT,
 
     /* CONTROLL FLOW */
 
-    IF, ELSE, FN, RETURN, FOR,
+    IF, ELSE, FN, RETURN, FOR, IN,
 
     /* BUILT-IN FUNCTIONS */
     PRINT, PRINTLN,
@@ -36,8 +37,8 @@ public class TokenPosition {
     }
 
     public string FileName { get; private set; } = "";
-    public uint Line { get; private set; } = 0;
-    public uint Char { get; private set; } = 0;
+    public uint Line { get; private set; } = 1;
+    public uint Char { get; private set; } = 1;
 
     public override string ToString() {
         return $"{FileName}:{Line}:{Char}";

@@ -1,3 +1,0 @@
-printLn "Numbers"
-print 34
-print(35)

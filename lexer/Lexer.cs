@@ -18,7 +18,9 @@ public class Lexer {
         {"return", TokenType.RETURN},
         {"for", TokenType.FOR},
         {"print", TokenType.PRINT},
-        {"printLn", TokenType.PRINTLN}
+        {"printLn", TokenType.PRINTLN},
+        {"in", TokenType.IN},
+        {"nil", TokenType.NIL}
     };
 
     char shift(char[] src) {
@@ -56,6 +58,17 @@ public class Lexer {
                 }
                 _currentLine++;
                 shift(src);
+            }
+            else if (src[_currentPos] == '.') {
+                if (_currentPos + 1 < src.Length && src[_currentPos + 1] == '.') {
+                    AddToken("..", TokenType.DOT_DOT, src);
+                    shift(src);
+                    shift(src);
+                }
+                else {
+                    AddToken(".", TokenType.DOT, src);
+                    shift(src);
+                }
             }
             else if (src[_currentPos] == '(') {
                 AddToken("(", TokenType.LPREN, src);
@@ -116,6 +129,10 @@ public class Lexer {
                 AddToken(">", TokenType.GREATER, src);
                 shift(src);
             }
+            else if (src[_currentPos] == '<') {
+                AddToken("<", TokenType.LESS, src);
+                shift(src);
+            }
             else if (src[_currentPos] == '!') {
                 if (_currentPos + 1 < src.Length && src[_currentPos + 1] == '=') {
                     AddToken("!=", TokenType.NOT_EQUAL, src);
@@ -127,6 +144,7 @@ public class Lexer {
                     shift(src);
                 }
             }
+
             else if (src[_currentPos] == '=') {
                 if (_currentPos + 1 < src.Length && src[_currentPos + 1] == '=') {
                     AddToken("==", TokenType.EQUAL_EQUAL, src);
@@ -141,22 +159,48 @@ public class Lexer {
             else if (src[_currentPos] == '"') {
                 shift(src); // Skip opening quote
                 string buffer = "";
-                while (src[_currentPos] != '"') {
+                while (_currentPos < src.Length && src[_currentPos] != '"') {
                     buffer += src[_currentPos];
                     shift(src);
+                }
+                if (_currentPos >= src.Length || src[_currentPos] != '"') {
+                    Token errorToken = new Token(
+                        value: "\"",
+                        type: TokenType.EOF,
+                        tokenPosition: new TokenPosition(_fileName, _currentLine, _currentChar)
+                    );
+                    throw new PipeException($"String literals need closing `\"`!", errorToken, "LEXING");
                 }
                 shift(src); // Skip closing quote
                 AddToken(buffer, TokenType.STRING_LIT, src);
             }
             else if (Char.IsNumber(src[_currentPos])) {
                 string buffer = "";
-                while (_currentPos < src.Length && (Char.IsNumber(src[_currentPos]) || src[_currentPos] == '.')) {
+                bool hasDot = false;
+
+                while (_currentPos < src.Length) {
+                    // Check for range operator case FIRST
+                    if (src[_currentPos] == '.' &&
+                        _currentPos + 1 < src.Length &&
+                        src[_currentPos + 1] == '.') {
+                        break;
+                    }
+
+                    if (src[_currentPos] == '.') {
+                        if (hasDot) break; // Only allow one decimal point
+                        hasDot = true;
+                    }
+                    else if (!Char.IsNumber(src[_currentPos])) {
+                        break;
+                    }
+
                     buffer += src[_currentPos];
                     shift(src);
                 }
+
                 AddToken(buffer, TokenType.NUMBER_LIT, src);
             }
-            else if (Char.IsLetter(src[_currentPos])) {
+            else if (Char.IsLetterOrDigit(src[_currentPos]) || '_' == src[_currentPos]) {
                 string buffer = "";
                 while (_currentPos < src.Length && (Char.IsLetterOrDigit(src[_currentPos]) || src[_currentPos] == '_')) {
                     buffer += src[_currentPos];
@@ -176,7 +220,7 @@ public class Lexer {
                     tokenPosition: new TokenPosition(_fileName, _currentLine, _currentChar)
                 );
 
-                throw new LexerException($"Undefined token: '{invalidChar}'", errorToken);
+                throw new PipeException($"Undefined token: '{invalidChar}'", errorToken, "LEXING");
             }
         }
 
