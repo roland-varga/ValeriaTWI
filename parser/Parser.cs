@@ -16,6 +16,9 @@ public class Parser {
             if (_tokens[_index].Type == TokenType.PRINT) {
                 _program.Add(ParsePrint());
             }
+            else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.COLON) && Expect(_index + 2, TokenType.FN)) {
+                _program.Add(ParseFunctionDeclaration());
+            }
             else if (Expect(_index, TokenType.IF)) {
                 _program.Add(ParseIf());
             }
@@ -31,13 +34,45 @@ public class Parser {
             else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.EQUAL)) {
                 _program.Add(ParseAssignment());
             }
+            // Add this new condition for top-level function calls
+            else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.LPREN)) {
+                var callExpr = ParseExpr();
+                _program.Add(new ExpressionStatement(callExpr));
+            }
             else {
-                _index++; // Skip unknown tokens for now
+                _index++;
             }
         }
-
         return _program;
     }
+    FunctionDeclaration ParseFunctionDeclaration() {
+        // name
+        string name = _tokens[_index].Value;
+        _index += 2; // skip IDENT and ':'
+        _index++;    // skip 'fn'
+
+        // parameters
+        Expect(_index, TokenType.LPREN);
+        _index++;
+        var parameters = new List<string>();
+        if (!Expect(_index, TokenType.RPREN)) {
+            do {
+                parameters.Add(_tokens[_index].Value);
+                _index++;
+            } while (Expect(_index, TokenType.COMMA) && (_index++ >= 0));
+        }
+        Expect(_index, TokenType.RPREN);
+        _index++; // skip ')'
+
+        // equals
+        Expect(_index, TokenType.EQUAL);
+        _index++;
+
+        // body
+        var body = ParseBlock();
+        return new FunctionDeclaration(name, parameters, body);
+    }
+
 
     IASTNode ParseIndexing(IASTNode target) {
         while (Expect(_index, TokenType.LBRACKET)) {
@@ -100,12 +135,22 @@ public class Parser {
                 stmts.Add(ParseIf());
             else if (Expect(_index, TokenType.FOR))
                 stmts.Add(ParseFor());
+            else if (Expect(_index, TokenType.RETURN)) {
+                _index++;
+                var expr = ParseExpr();
+                stmts.Add(new ReturnStatement(expr));
+            }
+
             else if (Expect(_index, TokenType.LBRACE))
                 stmts.Add(ParseBlock());
             else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.ASSIGN_COLON))
                 stmts.Add(ParseLet());
             else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.EQUAL))
                 stmts.Add(ParseAssignment());
+            else if (Expect(_index, TokenType.IDENT) && Expect(_index + 1, TokenType.LPREN)) {
+                var callExpr = ParseExpr();
+                _program.Add(new ExpressionStatement(callExpr));
+            }
             else
                 _index++;
         }
@@ -206,6 +251,27 @@ public class Parser {
             }
             _index++;
             return expr;
+        }
+
+        if (Expect(_index, TokenType.IDENT)) {
+            IASTNode ident = new IdentExpression(_tokens[_index].Value);
+            _index++;
+
+            // function call?
+            if (Expect(_index, TokenType.LPREN)) {
+                _index++; // skip '('
+                var args = new List<IASTNode>();
+                if (!Expect(_index, TokenType.RPREN)) {
+                    do {
+                        args.Add(ParseExpr());
+                    } while (Expect(_index, TokenType.COMMA) && (_index++ >= 0));
+                }
+                Expect(_index, TokenType.RPREN);
+                _index++;
+                return new CallExpression(ident, args);
+            }
+
+            return ident;
         }
 
         // Array literal: [expr, expr, ...]

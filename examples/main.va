@@ -1,1 +1,9 @@
+add : fn(a, b) = {
+    return a + b
+}
 
+main : fn() =  {
+    print(add(34,35))
+}
+
+main()

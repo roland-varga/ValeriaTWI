@@ -1,6 +1,46 @@
 namespace Valeria.Parser;
 public interface IASTNode { }
 
+
+public class ExpressionStatement : IASTNode {
+    public IASTNode Expression { get; }
+    public ExpressionStatement(IASTNode expr) {
+        Expression = expr;
+    }
+}
+
+// A function declaration: `name : fn(a,b) = { … }`
+public class FunctionDeclaration : IASTNode {
+    public string Name { get; }
+    public List<string> Parameters { get; }
+    public Block Body { get; }
+
+    public FunctionDeclaration(string name, List<string> parameters, Block body) {
+        Name = name;
+        Parameters = parameters;
+        Body = body;
+    }
+}
+
+// A function call: `add(34,35)`
+public class CallExpression : IASTNode {
+    public IASTNode Callee { get; }
+    public List<IASTNode> Arguments { get; }
+
+    public CallExpression(IASTNode callee, List<IASTNode> args) {
+        Callee = callee;
+        Arguments = args;
+    }
+}
+
+// A return statement inside a function body
+public class ReturnStatement : IASTNode {
+    public IASTNode Expression { get; }
+    public ReturnStatement(IASTNode expr) {
+        Expression = expr;
+    }
+}
+
 public class NullExpression : IASTNode { }
 
 public class ArrayExpression(List<IASTNode> elements) : IASTNode {

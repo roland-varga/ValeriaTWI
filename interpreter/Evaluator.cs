@@ -16,26 +16,70 @@ public class Evaluator {
         _scopes.Push(global);
     }
 
-    public object Evaluate(IASTNode expr) {
+    public object Evaluate(IASTNode expr) => expr switch {
+        FunctionDeclaration fd => EvaluateFunctionDeclaration(fd),
+        CallExpression call => EvaluateCall(call),
+        ReturnStatement ret => throw new ReturnException(Evaluate(ret.Expression)),
+        NumberExpression num => num.Number,
+        NullExpression => null!,
+        StringExpression str => EvaluateString(str),
+        Block block => EvaluateBlock(block),
+        LetExpression let => EvaluateLet(let),
+        BinExpression bin => EvaluateBinary(bin),
+        PrintCall trace => EvaluatePrint(trace),
+        IdentExpression ident => EvaluateIdent(ident),
+        AssignExpression assign => EvaluateAssign(assign),
+        IfStmt @if => EvaluateIf(@if),
+        WhileLoop loop => EvaluateWhile(loop),
+        IndexExpression index => EvaluateIndex(index),
+        ArrayExpression array => EvaluateArray(array),
+        ForRangeLoop forLoop => EvaluateForRange(forLoop),
+        ExpressionStatement exprStmt => Evaluate(exprStmt.Expression),
+        _ => throw new Exception("Unknown expression type")
+    };
 
-        return expr switch {
-            NumberExpression num => num.Number,
-            NullExpression => null!,
-            StringExpression str => EvaluateString(str),
-            Block block => EvaluateBlock(block),
-            LetExpression let => EvaluateLet(let),
-            BinExpression bin => EvaluateBinary(bin),
-            PrintCall trace => EvaluatePrint(trace),
-            IdentExpression ident => EvaluateIdent(ident),
-            AssignExpression assign => EvaluateAssign(assign),
-            IfStmt @if => EvaluateIf(@if),
-            WhileLoop loop => EvaluateWhile(loop),
-            IndexExpression index => EvaluateIndex(index),
-            ArrayExpression array => EvaluateArray(array),
-            ForRangeLoop forLoop => EvaluateForRange(forLoop),
-            _ => throw new Exception("Unknown expression type")
-        };
+    object EvaluateFunctionDeclaration(FunctionDeclaration fd) {
+        // capture the function in the current scope
+        CurrentScope[fd.Name] = fd;
+        return null!;
     }
+
+    // custom exception to unwind to the call site
+    public class ReturnException : Exception {
+        public object Value { get; }
+        public ReturnException(object value) {
+            Value = value;
+        }
+    }
+
+    object EvaluateCall(CallExpression call) {
+        // resolve the function object
+        var funcObj = Evaluate(call.Callee);
+        if (funcObj is FunctionDeclaration fd) {
+            // evaluate arguments
+            var argValues = call.Arguments.Select(Evaluate).ToList();
+
+            // new call scope
+            var callScope = new Dictionary<string, object>();
+            for (int i = 0; i < fd.Parameters.Count; i++) {
+                callScope[fd.Parameters[i]] = argValues[i];
+            }
+            _scopes.Push(callScope);
+            try {
+                // execute body
+                Evaluate(fd.Body);
+                return null!; // if no return, returns null
+            }
+            catch (ReturnException ret) {
+                return ret.Value;
+            }
+            finally {
+                _scopes.Pop();
+            }
+        }
+        throw new Exception("Attempt to call a non-function");
+    }
+
 
     object EvaluateArray(ArrayExpression array) {
         var result = new List<object>();
