@@ -8,8 +8,6 @@ public class Evaluator {
     Stack<Dictionary<string, object>> _scopes = new();
     Dictionary<string, object> CurrentScope => _scopes.Peek();
 
-    // Dictionary<string, FunctionDeclaration> _functions = new();
-
     public Evaluator() {
         var global = new Dictionary<string, object> {
             { "true", 1.0 },
@@ -63,18 +61,50 @@ public class Evaluator {
 
     object EvaluateString(StringExpression strExpr) {
         string raw = strExpr.String;
-        string result = Regex.Replace(raw, @"\$\{(\w+)\}", match => {
+
+        string result = Regex.Replace(raw, @"\$\{(\w+)(?:\[(\w+)\])?\}", match => {
             string varName = match.Groups[1].Value;
+            string? indexOrNull = match.Groups[2].Success ? match.Groups[2].Value : null;
 
             foreach (var scope in _scopes) {
                 if (scope.TryGetValue(varName, out var value)) {
-                    return value?.ToString() ?? "nil";
+                    if (indexOrNull != null) {
+                        if (value is List<object> list) {
+                            object indexVal;
+                            // Try to parse as number first
+                            if (int.TryParse(indexOrNull, out int literalIndex)) {
+                                indexVal = literalIndex;
+                            }
+                            else {
+                                // Look up variable index
+                                indexVal = _scopes
+                                    .Select(s => s.TryGetValue(indexOrNull, out var v) ? v : null)
+                                    .FirstOrDefault(v => v != null)
+                                    ?? throw new Exception($"Undefined index variable: {indexOrNull}");
+                            }
+
+                            int idx = (int)ExpectNumber(indexVal);
+                            if (idx < 0 || idx >= list.Count)
+                                throw new Exception($"Index {idx} out of bounds for variable '{varName}'");
+                            return list[idx]?.ToString() ?? "nil";
+                        }
+                        else {
+                            throw new Exception($"Variable '{varName}' is not an array");
+                        }
+                    }
+                    else {
+                        return value?.ToString() ?? "nil";
+                    }
                 }
             }
+
             throw new Exception($"Undefined variable in string interpolation: {varName}");
         });
+
         return result;
     }
+
+
 
     object EvaluateWhile(WhileLoop loop) {
         while (ExpectNumber(Evaluate(loop.Condition)) != 0) {
